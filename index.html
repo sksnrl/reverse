@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="EUC-KR">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>여러 MP3 파일 개별 재생</title>
+</head>
+<body>
+    <h2>MP3 파일을 여러 개 업로드하여 개별적으로 재생하세요</h2>
+    <input type="file" id="audioFiles" accept="audio/mp3" multiple><br><br>
+    <div id="audioControls"></div>
+
+    <script>
+        let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        let audioBuffers = {}; // 파일별 오디오 데이터를 저장
+        let sources = {}; // 파일별 재생 소스 저장
+
+        document.getElementById("audioFiles").addEventListener("change", function(event) {
+            const files = event.target.files;
+            const controlsDiv = document.getElementById("audioControls");
+            controlsDiv.innerHTML = ""; // 기존 버튼들 초기화
+
+            Array.from(files).forEach((file, index) => {
+                const reader = new FileReader();
+                reader.readAsArrayBuffer(file);
+                reader.onload = function() {
+                    audioContext.decodeAudioData(reader.result, function(buffer) {
+                        const fileId = `file_${index}`;
+                        audioBuffers[fileId] = buffer;
+
+                        // 각 파일별 UI 버튼 생성
+                        const fileDiv = document.createElement("div");
+                        fileDiv.innerHTML = `
+                            <p>${file.name}</p>
+                            <button onclick="playAudio('${fileId}')">정방향 재생</button>
+                            <button onclick="reverseAudio('${fileId}')">거꾸로 재생</button>
+                            <button onclick="pauseAudio('${fileId}')">일시정지</button>
+                        `;
+                        controlsDiv.appendChild(fileDiv);
+                    });
+                };
+            });
+        });
+
+        function stopAudio(fileId) {
+            if (sources[fileId]) {
+                sources[fileId].stop();
+                sources[fileId].disconnect();
+                sources[fileId] = null;
+            }
+        }
+
+        function playAudio(fileId) {
+            if (!audioBuffers[fileId]) {
+                alert("파일이 로드되지 않았습니다.");
+                return;
+            }
+            stopAudio(fileId);
+
+            const source = audioContext.createBufferSource();
+            source.buffer = audioBuffers[fileId];
+            source.connect(audioContext.destination);
+            source.start(0);
+            sources[fileId] = source;
+        }
+
+        function reverseAudio(fileId) {
+            if (!audioBuffers[fileId]) {
+                alert("파일이 로드되지 않았습니다.");
+                return;
+            }
+            stopAudio(fileId);
+
+            const originalBuffer = audioBuffers[fileId];
+            const reversedBuffer = audioContext.createBuffer(
+                originalBuffer.numberOfChannels,
+                originalBuffer.length,
+                originalBuffer.sampleRate
+            );
+
+            for (let i = 0; i < originalBuffer.numberOfChannels; i++) {
+                const channelData = originalBuffer.getChannelData(i);
+                const reversedData = reversedBuffer.getChannelData(i);
+                for (let j = 0; j < channelData.length; j++) {
+                    reversedData[j] = channelData[channelData.length - 1 - j];
+                }
+            }
+
+            const source = audioContext.createBufferSource();
+            source.buffer = reversedBuffer;
+            source.connect(audioContext.destination);
+            source.start(0);
+            sources[fileId] = source;
+        }
+
+        function pauseAudio(fileId) {
+            stopAudio(fileId);
+        }
+    </script>
+</body>
+</html>

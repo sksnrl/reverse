@@ -1,24 +1,24 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="EUC-KR">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>¿©·¯ MP3 ÆÄÀÏ °³º° Àç»ı</title>
+    <title>ì—¬ëŸ¬ MP3 íŒŒì¼ ê°œë³„ ì¬ìƒ</title>
 </head>
 <body>
-    <h2>MP3 ÆÄÀÏÀ» ¿©·¯ °³ ¾÷·ÎµåÇÏ¿© °³º°ÀûÀ¸·Î Àç»ıÇÏ¼¼¿ä</h2>
+    <h2>MP3 íŒŒì¼ì„ ì—¬ëŸ¬ ê°œ ì—…ë¡œë“œí•˜ì—¬ ê°œë³„ì ìœ¼ë¡œ ì¬ìƒí•˜ì„¸ìš”</h2>
     <input type="file" id="audioFiles" accept="audio/mp3" multiple><br><br>
     <div id="audioControls"></div>
 
     <script>
         let audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        let audioBuffers = {}; // ÆÄÀÏº° ¿Àµğ¿À µ¥ÀÌÅÍ¸¦ ÀúÀå
-        let sources = {}; // ÆÄÀÏº° Àç»ı ¼Ò½º ÀúÀå
+        let audioBuffers = {}; // íŒŒì¼ë³„ ì˜¤ë””ì˜¤ ë°ì´í„°ë¥¼ ì €ì¥
+        let sources = {}; // íŒŒì¼ë³„ ì¬ìƒ ì†ŒìŠ¤ ì €ì¥
 
         document.getElementById("audioFiles").addEventListener("change", function(event) {
             const files = event.target.files;
             const controlsDiv = document.getElementById("audioControls");
-            controlsDiv.innerHTML = ""; // ±âÁ¸ ¹öÆ°µé ÃÊ±âÈ­
+            controlsDiv.innerHTML = ""; // ê¸°ì¡´ ë²„íŠ¼ë“¤ ì´ˆê¸°í™”
 
             Array.from(files).forEach((file, index) => {
                 const reader = new FileReader();
@@ -28,13 +28,13 @@
                         const fileId = `file_${index}`;
                         audioBuffers[fileId] = buffer;
 
-                        // °¢ ÆÄÀÏº° UI ¹öÆ° »ı¼º
+                        // ê° íŒŒì¼ë³„ UI ë²„íŠ¼ ìƒì„±
                         const fileDiv = document.createElement("div");
                         fileDiv.innerHTML = `
                             <p>${file.name}</p>
-                            <button onclick="playAudio('${fileId}')">Á¤¹æÇâ Àç»ı</button>
-                            <button onclick="reverseAudio('${fileId}')">°Å²Ù·Î Àç»ı</button>
-                            <button onclick="pauseAudio('${fileId}')">ÀÏ½ÃÁ¤Áö</button>
+                            <button onclick="playAudio('${fileId}')">ì •ë°©í–¥ ì¬ìƒ</button>
+                            <button onclick="reverseAudio('${fileId}')">ê±°ê¾¸ë¡œ ì¬ìƒ</button>
+                            <button onclick="pauseAudio('${fileId}')">ì¼ì‹œì •ì§€</button>
                         `;
                         controlsDiv.appendChild(fileDiv);
                     });
@@ -52,7 +52,7 @@
 
         function playAudio(fileId) {
             if (!audioBuffers[fileId]) {
-                alert("ÆÄÀÏÀÌ ·ÎµåµÇÁö ¾Ê¾Ò½À´Ï´Ù.");
+                alert("íŒŒì¼ì´ ë¡œë“œë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤.");
                 return;
             }
             stopAudio(fileId);
@@ -66,7 +66,7 @@
 
         function reverseAudio(fileId) {
             if (!audioBuffers[fileId]) {
-                alert("ÆÄÀÏÀÌ ·ÎµåµÇÁö ¾Ê¾Ò½À´Ï´Ù.");
+                alert("íŒŒì¼ì´ ë¡œë“œë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤.");
                 return;
             }
             stopAudio(fileId);

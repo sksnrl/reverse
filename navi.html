@@ -193,43 +193,7 @@ window.addEventListener('resize', () => {
   goToSlide(currentIndex);
 });
 
-    //PC도 터치로
-    let isDragging = false;
-let startX = 0;
-let endX = 0;
-const dragThreshold = 50; // 최소 드래그 거리 (픽셀)
-
-// 마우스 눌렀을 때
-slidesDiv.addEventListener('mousedown', (e) => {
-  isDragging = true;
-  startX = e.clientX;
-});
-
-// 마우스 움직일 때
-slidesDiv.addEventListener('mousemove', (e) => {
-  if (!isDragging) return;
-  endX = e.clientX;
-});
-
-// 마우스 뗐을 때
-slidesDiv.addEventListener('mouseup', () => {
-  if (!isDragging) return;
-  isDragging = false;
-
-  const distance = endX - startX;
-  if (Math.abs(distance) > dragThreshold) {
-    if (distance < 0) {
-      goToSlide(currentIndex + 1);
-    } else {
-      goToSlide(currentIndex - 1);
-    }
-  }
-});
-
-// 마우스 밖으로 나가서 드래그 중단
-slidesDiv.addEventListener('mouseleave', () => {
-  isDragging = false;
-});
+    
 
     // 초기 세팅
     goToSlide(0);
@@ -237,6 +201,7 @@ slidesDiv.addEventListener('mouseleave', () => {
 
 </body>
 </html>
+
 
 
 

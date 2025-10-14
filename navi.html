@@ -151,6 +151,31 @@
     btnNext.addEventListener('click', () => {
       goToSlide(currentIndex + 1);
     });
+//터치
+    let startX = 0;
+let endX = 0;
+const threshold = 50; // 최소 스와이프 거리 (픽셀)
+
+slidesDiv.addEventListener('touchstart', (e) => {
+  startX = e.touches[0].clientX;
+}, { passive: true });
+
+slidesDiv.addEventListener('touchmove', (e) => {
+  endX = e.touches[0].clientX;
+}, { passive: true });
+
+slidesDiv.addEventListener('touchend', () => {
+  const distance = endX - startX;
+  if (Math.abs(distance) > threshold) {
+    if (distance < 0) {
+      // 왼쪽으로 스와이프 → 다음 슬라이드
+      goToSlide(currentIndex + 1);
+    } else {
+      // 오른쪽으로 스와이프 → 이전 슬라이드
+      goToSlide(currentIndex - 1);
+    }
+  }
+});
 
     // 초기 세팅
     goToSlide(0);
@@ -158,4 +183,5 @@
 
 </body>
 </html>
+
 

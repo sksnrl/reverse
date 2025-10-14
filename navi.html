@@ -176,12 +176,28 @@ slidesDiv.addEventListener('touchend', () => {
     }
   }
 });
+//슬라이더 반응형
+    const sliderContainer = document.querySelector('.slider-container');
 
+function goToSlide(idx) {
+  if (idx < 0) idx = total - 1;
+  if (idx >= total) idx = 0;
+  currentIndex = idx;
+
+  const slideWidth = sliderContainer.clientWidth;
+  slidesDiv.style.transform = `translateX(${-idx * slideWidth}px)`;
+  updateDots();
+}
+
+window.addEventListener('resize', () => {
+  goToSlide(currentIndex);
+});
     // 초기 세팅
     goToSlide(0);
   </script>
 
 </body>
 </html>
+
 
 

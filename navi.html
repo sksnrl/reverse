@@ -26,17 +26,18 @@
       display: flex;
       transition: transform 0.5s ease-in-out;
     }
-    .slide {
-      min-width: 500px;
-      /* height is auto by image ratio */
-      box-sizing: border-box;
-      flex-shrink: 0;
-    }
-    .slide img {
-      display: block;
-      width: 500px;
-      height: auto;
-    }
+.slide {
+  min-width: 0; /* 500px 고정 폭 제거 */
+  width: 100%;   /* 부모 요소에 맞게 너비를 채움 */
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.slide img {
+  display: block;
+  width: 100%;   /* 부모 .slide의 폭에 맞게 자동 조절 */
+  height: auto;
+}
     /* 버튼 스타일 */
     .nav-button {
       position: absolute;
@@ -157,3 +158,4 @@
 
 </body>
 </html>
+

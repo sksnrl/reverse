@@ -4,7 +4,208 @@
   const roomParam = (params.get("room") || "").toUpperCase();
   const $ = id => document.getElementById(id);
 
-  // 직업별 아이콘 및 설명 고도화 (이모지 & 컬러 테마 연계)
+
+  // ==========================================================
+  // Web Audio API 기반 긴장감 넘치는 사운드 신시사이저 엔진
+  // (외부 mp3 파일 없이 브라우저 자체 오디오 합성을 통해 무음 방지 & 즉각 재생)
+  // ==========================================================
+  const SoundFX = (() => {
+    let ctx = null;
+    let muted = localStorage.getItem("mn_muted") === "true";
+
+    function getCtx() {
+      if (!ctx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) ctx = new AudioContext();
+      }
+      if (ctx && ctx.state === "suspended") {
+        ctx.resume();
+      }
+      return ctx;
+    }
+
+    function isMuted() {
+      return muted;
+    }
+
+    function toggleMute() {
+      muted = !muted;
+      localStorage.setItem("mn_muted", muted ? "true" : "false");
+      return muted;
+    }
+
+    // 1. UI 클릭 / 버튼 터치음 (스마트 틱)
+    function click() {
+      if (muted) return;
+      const c = getCtx(); if (!c) return;
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(800, c.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(300, c.currentTime + 0.05);
+      gain.gain.setValueAtTime(0.15, c.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.05);
+      osc.connect(gain);
+      gain.connect(c.destination);
+      osc.start();
+      osc.stop(c.currentTime + 0.06);
+    }
+
+    // 2. 대상 지목 / 투표 선택음 (긴장감 있는 블립)
+    function select() {
+      if (muted) return;
+      const c = getCtx(); if (!c) return;
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(440, c.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, c.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.2, c.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.12);
+      osc.connect(gain);
+      gain.connect(c.destination);
+      osc.start();
+      osc.stop(c.currentTime + 0.13);
+    }
+
+    // 3. 밤 페이즈 전환 (심야의 음산한 저음 콰앙 & 앰비언트)
+    function phaseNight() {
+      if (muted) return;
+      const c = getCtx(); if (!c) return;
+      const now = c.currentTime;
+      // 저음 드론
+      const osc1 = c.createOscillator();
+      const osc2 = c.createOscillator();
+      const gain = c.createGain();
+      osc1.type = "sawtooth";
+      osc2.type = "sine";
+      osc1.frequency.setValueAtTime(110, now);
+      osc1.frequency.exponentialRampToValueAtTime(55, now + 1.8);
+      osc2.frequency.setValueAtTime(58, now);
+      osc2.frequency.exponentialRampToValueAtTime(45, now + 2.0);
+
+      const filter = c.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(400, now);
+      filter.frequency.exponentialRampToValueAtTime(120, now + 1.8);
+
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+
+      osc1.connect(filter);
+      osc2.connect(filter);
+      filter.connect(gain);
+      gain.connect(c.destination);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 2.3);
+      osc2.stop(now + 2.3);
+    }
+
+    // 4. 낮 / 아침 발표 (종소리 & 서광 화음)
+    function phaseDay() {
+      if (muted) return;
+      const c = getCtx(); if (!c) return;
+      const now = c.currentTime;
+      [523.25, 659.25, 783.99].forEach((freq, idx) => {
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+        gain.gain.setValueAtTime(0.18, now + idx * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 1.2);
+        osc.connect(gain);
+        gain.connect(c.destination);
+        osc.start(now + idx * 0.1);
+        osc.stop(now + idx * 0.1 + 1.3);
+      });
+    }
+
+    // 5. 투표 시작 (긴장감 있는 법정 타격음 / 고공 타격)
+    function phaseVote() {
+      if (muted) return;
+      const c = getCtx(); if (!c) return;
+      const now = c.currentTime;
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(80, now + 0.4);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+      osc.connect(gain);
+      gain.connect(c.destination);
+      osc.start(now);
+      osc.stop(now + 0.46);
+    }
+
+    // 6. 타이머 심장박동 / 시계 째깍 소리 (틱)
+    function tick(urgent = false) {
+      if (muted) return;
+      const c = getCtx(); if (!c) return;
+      const now = c.currentTime;
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(urgent ? 920 : 600, now);
+      osc.frequency.exponentialRampToValueAtTime(urgent ? 450 : 200, now + 0.04);
+      gain.gain.setValueAtTime(urgent ? 0.15 : 0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+      osc.connect(gain);
+      gain.connect(c.destination);
+      osc.start(now);
+      osc.stop(now + 0.05);
+    }
+
+    // 7. 처형 / 탈락 음 (묵직한 사형 판결 타격음)
+    function eliminated() {
+      if (muted) return;
+      const c = getCtx(); if (!c) return;
+      const now = c.currentTime;
+      // 노이즈 버퍼 + 저음 감쇠 쿵
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(140, now);
+      osc.frequency.exponentialRampToValueAtTime(30, now + 0.9);
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+      osc.connect(gain);
+      gain.connect(c.destination);
+      osc.start(now);
+      osc.stop(now + 1.1);
+    }
+
+    // 8. 승리 팡파르 (마피아 승리 vs 시민 승리)
+    function victory(winner) {
+      if (muted) return;
+      const c = getCtx(); if (!c) return;
+      const now = c.currentTime;
+      const notes = winner === "mafia"
+        ? [220, 261.63, 207.65, 174.61] // 음산한 마피아 승리 단조
+        : [523.25, 659.25, 783.99, 1046.50]; // 찬란한 시민 승리 장조
+      notes.forEach((freq, i) => {
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = winner === "mafia" ? "sawtooth" : "triangle";
+        osc.frequency.setValueAtTime(freq, now + i * 0.22);
+        gain.gain.setValueAtTime(0.25, now + i * 0.22);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.22 + 1.0);
+        osc.connect(gain);
+        gain.connect(c.destination);
+        osc.start(now + i * 0.22);
+        osc.stop(now + i * 0.22 + 1.1);
+      });
+    }
+
+    return {
+      getCtx, isMuted, toggleMute, click, select, phaseNight, phaseDay, phaseVote, tick, eliminated, victory
+    };
+  })();
+
+
+  // 직업별 정보
   const roleInfo = {
     mafia: {
       name: "마피아",
@@ -54,7 +255,7 @@
   };
 
   let socket = null, state = null, me = null, isHost = false, hostToken = null;
-  let countdownInterval = null;
+  let countdownInterval = null, lastPhase = null, lastSec = null;
 
   const saveSession = (code, playerId, host=false, token=null) => {
     try { sessionStorage.setItem("mn_session", JSON.stringify({code,playerId,host,token})); } catch {}
@@ -64,6 +265,7 @@
   function toast(msg) {
     const el = $("toast"); if (!el) return;
     el.textContent = msg; el.classList.add("show");
+    SoundFX.click();
     setTimeout(() => el.classList.remove("show"), 2800);
   }
 
@@ -85,6 +287,7 @@
 
   function connect() {
     if (socket) return;
+    SoundFX.getCtx();
     const backend = getBackendUrl();
     if (!backend) { toast("서버 주소가 설정되지 않았습니다."); return; }
 
@@ -97,7 +300,7 @@
       }
     });
 
-    socket.on("connect_error", () => toast("서버 연결에 실패했습니다. Render 서버가 절전 모드에서 깨어나는 중일 수 있습니다."));
+    socket.on("connect_error", () => toast("서버 연결에 실패했습니다. Render 서버가 깨어나는 중일 수 있습니다."));
     socket.on("error_message", msg => toast(msg));
     
     socket.on("created", data => {
@@ -136,6 +339,7 @@
   }
 
   function createRoom() {
+    SoundFX.click();
     connect();
     const nick = $("hostNick").value.trim() || "진행자";
     const go = () => socket.emit("room:create", { nickname: nick });
@@ -143,6 +347,7 @@
   }
 
   function joinRoom() {
+    SoundFX.click();
     connect();
     const code = $("joinCode").value.trim().toUpperCase();
     const nickname = $("playerNick").value.trim();
@@ -151,8 +356,20 @@
     if (socket?.connected) go(); else socket?.once("connect", go);
   }
 
+  function handlePhaseSound(phase, winner) {
+    if (phase === lastPhase) return;
+    lastPhase = phase;
+    if (phase === "night") SoundFX.phaseNight();
+    else if (phase === "announcement" || phase === "discussion") SoundFX.phaseDay();
+    else if (phase === "voting") SoundFX.phaseVote();
+    else if (phase === "verdict") SoundFX.eliminated();
+    else if (phase === "finished") SoundFX.victory(winner);
+  }
+
   function renderState() {
     if (!state) return;
+    handlePhaseSound(state.phase, state.winner);
+
     if (mode === "broadcast") return renderBroadcast();
 
     showGame(state.code);
@@ -165,7 +382,6 @@
     $("phaseTitle").textContent = `${currentMeta.title}${state.round ? ` · 제 ${state.round} 라운드` : ""}`;
     $("phaseMessage").textContent = state.message || "";
 
-    // 플레이어 목록 렌더링
     $("players").innerHTML = state.players.map(p => {
       const isMe = p.id === me;
       const role = state.revealedRoles?.[p.id];
@@ -253,7 +469,9 @@
       `;
 
       actions.querySelectorAll("[data-target]").forEach(b => b.addEventListener("click", () => {
+        SoundFX.select();
         if (confirm(`[${b.querySelector("span").textContent.replace("🎯 ","")}] 님을 선택하시겠습니까?`)) {
+          SoundFX.click();
           socket.emit("game:action", { targetId: b.dataset.target });
         }
       }));
@@ -279,8 +497,10 @@
       `;
 
       actions.querySelectorAll("[data-target]").forEach(b => b.addEventListener("click", () => {
+        SoundFX.select();
         const name = b.querySelector("span").textContent;
         if (confirm(`${name}에 투표하시겠습니까? (투표 마감 전까지 변경 가능)`)) {
+          SoundFX.click();
           socket.emit("game:vote", { targetId: b.dataset.target });
         }
       }));
@@ -301,9 +521,19 @@
       const timeStr = `${String(Math.floor(secs/60)).padStart(2,"0")}:${String(secs%60).padStart(2,"0")}`;
       if ($("countdownVal")) $("countdownVal").textContent = timeStr;
       if (mode === "broadcast" && $("broadcastTimer")) $("broadcastTimer").textContent = timeStr;
+
+      // 1초 단위로 사운드 틱 발생 (마지막 10초는 긴박한 틱)
+      if (secs !== lastSec) {
+        lastSec = secs;
+        if (secs > 0 && secs <= 10) {
+          SoundFX.tick(true);
+        } else if (secs > 0 && secs <= 25 && state.phase === "voting") {
+          SoundFX.tick(false);
+        }
+      }
     };
     tick();
-    countdownInterval = setInterval(tick, 300);
+    countdownInterval = setInterval(tick, 250);
   }
 
   function renderBroadcast() {
@@ -344,8 +574,29 @@
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
+  function updateSoundBtn() {
+    const btn = $("soundToggleBtn");
+    if (!btn) return;
+    const muted = SoundFX.isMuted();
+    btn.textContent = muted ? "🔇" : "🔊";
+    btn.title = muted ? "사운드 켜기" : "사운드 음소거";
+  }
+
   function setup() {
+    updateSoundBtn();
+
+    const soundBtn = $("soundToggleBtn");
+    if (soundBtn) {
+      soundBtn.addEventListener("click", () => {
+        const isMuted = SoundFX.toggleMute();
+        updateSoundBtn();
+        toast(isMuted ? "사운드가 음소거되었습니다." : "사운드가 활성화되었습니다.");
+        if (!isMuted) SoundFX.click();
+      });
+    }
+
     $("serverConfigBtn").addEventListener("click", () => {
+      SoundFX.click();
       const cur = localStorage.getItem("mn_backend_url") || "";
       const next = prompt("연결할 백엔드 서버 URL을 입력하세요:", cur);
       if (next !== null) {
@@ -354,6 +605,11 @@
         setTimeout(() => location.reload(), 600);
       }
     });
+
+    // 최초 화면 터치/클릭 시 AudioContext 언락
+    document.addEventListener("pointerdown", () => {
+      SoundFX.getCtx();
+    }, { once: true });
 
     if (mode === "broadcast") {
       $("home").classList.add("hidden");
@@ -376,6 +632,7 @@
     $("joinRoom").addEventListener("click", joinRoom);
     
     $("copyCode").addEventListener("click", async () => {
+      SoundFX.click();
       try {
         await navigator.clipboard.writeText($("roomCode").textContent);
         toast("방 코드를 클립보드에 복사했습니다.");
@@ -384,9 +641,16 @@
       }
     });
 
-    $("startGame").addEventListener("click", () => socket.emit("game:start"));
-    $("advancePhase").addEventListener("click", () => socket.emit("host:advance"));
+    $("startGame").addEventListener("click", () => {
+      SoundFX.click();
+      socket.emit("game:start");
+    });
+    $("advancePhase").addEventListener("click", () => {
+      SoundFX.click();
+      socket.emit("host:advance");
+    });
     $("restartGame").addEventListener("click", () => {
+      SoundFX.click();
       if (confirm("게임을 초기화하고 로비로 돌아갈까요?")) socket.emit("host:restart");
     });
 

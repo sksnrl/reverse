@@ -3,79 +3,225 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#10151f">
+  <meta name="theme-color" content="#07090e">
   <title>MAFIA NIGHT: LIVE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Outfit:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./style.css">
   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
 </head>
-<body>
-  <div class="noise"></div>
+<body class="theme-lobby">
+  <div class="fog-layer"></div>
+  <div class="vignette"></div>
+
   <header class="topbar">
-    <a class="brand" href="./"><span class="brand-mark">M</span><span>MAFIA NIGHT <em>LIVE</em></span></a>
-    <div class="top-tag">SOCIAL DEDUCTION · LIVE</div>
+    <a class="brand" href="./">
+      <span class="brand-badge">♠</span>
+      <div class="brand-text">
+        <span class="brand-title">MAFIA NIGHT</span>
+        <span class="brand-sub">LIVE BROADCAST EDITION</span>
+      </div>
+    </a>
+    <div class="topbar-right">
+      <div id="liveIndicator" class="live-pill">
+        <span class="live-pulse"></span>
+        <span class="live-label">LIVE DEDUCTION</span>
+      </div>
+      <button id="serverConfigBtn" class="icon-btn" title="서버 주소 설정">⚙️</button>
+    </div>
   </header>
+
   <main id="app" class="shell">
-    <section class="hero">
-      <div class="eyebrow"><span class="live-dot"></span> BROADCAST PARTY GAME</div>
-      <h1>믿음은 무기,<br><span>의심은 생존.</span></h1>
-      <p>방을 만들거나 코드로 참가하세요. 직업은 비밀, 선택은 결정적입니다.</p>
+    <!-- 홈 대기 화면 -->
+    <section id="home" class="view-home">
+      <div class="hero">
+        <div class="hero-badge">SOCIAL DEDUCTION BROADCAST</div>
+        <h1 class="hero-title">
+          밤이 내리면,<br>
+          <span class="glow-text">진실은 피를 흘린다.</span>
+        </h1>
+        <p class="hero-desc">스트리머와 시청자가 함께 즐기는 실시간 마피아 추리 서바이벌. 직업은 극비, 선택은 치명적입니다.</p>
+      </div>
+
+      <div class="home-grid">
+        <!-- 호스트 카드 -->
+        <div class="card card-host">
+          <div class="card-glow-host"></div>
+          <div class="card-header">
+            <span class="kicker">01 / HOST</span>
+            <span class="card-icon">👑</span>
+          </div>
+          <h2>새 게임 개설</h2>
+          <p class="card-sub">방을 만들고 참가자들을 초대하여 게임을 주재합니다.</p>
+          <div class="input-wrap">
+            <label for="hostNick">진행자(호스트) 닉네임</label>
+            <input id="hostNick" maxlength="16" placeholder="예: 마피아마스터" value="진행자">
+          </div>
+          <button id="createRoom" class="btn btn-primary btn-glow">
+            <span>방 생성하고 시작</span>
+            <span class="btn-arrow">→</span>
+          </button>
+          <p class="hint">💡 방 생성 후 참가 코드와 방송 송출 전용 오버레이 URL이 발급됩니다.</p>
+        </div>
+
+        <!-- 플레이어 참가 카드 -->
+        <div class="card card-join">
+          <div class="card-glow-join"></div>
+          <div class="card-header">
+            <span class="kicker">02 / PLAYER</span>
+            <span class="card-icon">🎭</span>
+          </div>
+          <h2>게임 참가하기</h2>
+          <p class="card-sub">호스트에게 전달받은 5자리 코드로 접속하세요.</p>
+          <div class="input-grid">
+            <div class="input-wrap">
+              <label for="joinCode">방 코드 (5자리)</label>
+              <input id="joinCode" maxlength="5" placeholder="예: A7K2P" autocomplete="off" class="mono-input">
+            </div>
+            <div class="input-wrap">
+              <label for="playerNick">내 닉네임</label>
+              <input id="playerNick" maxlength="16" placeholder="게임에서 불릴 닉네임">
+            </div>
+          </div>
+          <button id="joinRoom" class="btn btn-secondary">
+            <span>게임 룸 입장하기</span>
+            <span class="btn-arrow">→</span>
+          </button>
+          <p class="hint">별도 설치나 회원가입 없이 브라우저에서 즉시 플레이 가능합니다.</p>
+        </div>
+      </div>
     </section>
-    <section id="home" class="panel home-grid">
-      <div class="form-card">
-        <div class="section-kicker">01 / HOST</div>
-        <h2>새로운 방 만들기</h2>
-        <label for="hostNick">진행자 닉네임</label>
-        <input id="hostNick" maxlength="16" placeholder="예: 로즈빵" value="진행자">
-        <button id="createRoom" class="btn btn-primary">방 생성하기 <span>↗</span></button>
-        <p class="hint">방 생성 후 참가 코드와 방송용 URL이 표시됩니다.</p>
+
+    <!-- 인게임 플레이 화면 -->
+    <section id="game" class="view-game hidden">
+      <!-- 상단 상태 바 -->
+      <div class="game-hud">
+        <div class="hud-left">
+          <div class="hud-phase-badge" id="hudBadge">
+            <span class="phase-icon" id="phaseIcon">⌛</span>
+            <div>
+              <div class="hud-kicker" id="roomLabel">PHASE STATUS</div>
+              <h2 id="phaseTitle">로비 대기</h2>
+            </div>
+          </div>
+          <p id="phaseMessage" class="phase-msg"></p>
+        </div>
+
+        <div class="hud-right">
+          <div class="code-box">
+            <span class="code-label">ROOM CODE</span>
+            <span id="roomCode" class="code-val">-----</span>
+            <button id="copyCode" class="btn-copy" title="코드 복사">📋 복사</button>
+          </div>
+        </div>
       </div>
-      <div class="form-card">
-        <div class="section-kicker">02 / PLAYER</div>
-        <h2>게임 참가하기</h2>
-        <label for="joinCode">방 코드</label>
-        <input id="joinCode" maxlength="5" placeholder="예: A7K2P" autocomplete="off">
-        <label for="playerNick">플레이어 닉네임</label>
-        <input id="playerNick" maxlength="16" placeholder="방송에서 사용할 닉네임">
-        <button id="joinRoom" class="btn btn-secondary">게임 입장 <span>→</span></button>
-        <p class="hint">방 코드는 진행자에게 받으세요. 별도 설치가 필요 없습니다.</p>
-      </div>
-    </section>
-    <section id="game" class="hidden">
-      <div class="game-head panel">
-        <div><div class="section-kicker" id="roomLabel">ROOM</div><h2 id="phaseTitle">로비</h2><p id="phaseMessage" class="muted"></p></div>
-        <div class="room-code"><small>ROOM CODE</small><strong id="roomCode">-----</strong><button id="copyCode" class="mini-btn">복사</button></div>
-      </div>
+
+      <!-- 메인 2단 레이아웃 -->
       <div class="game-layout">
+        <!-- 좌측: 참가자 명단 -->
         <section class="panel player-panel">
-          <div class="panel-title"><h3>플레이어</h3><span id="playerCount" class="count-pill">0 / 12</span></div>
+          <div class="panel-header">
+            <div class="panel-title-wrap">
+              <span class="panel-icon">👥</span>
+              <h3>도시 거주자 명단</h3>
+            </div>
+            <span id="playerCount" class="count-pill">0 / 12</span>
+          </div>
           <div id="players" class="players-grid"></div>
         </section>
+
+        <!-- 우측: 내 정체 및 액션 조작 -->
         <aside class="panel action-panel">
-          <div class="section-kicker">YOUR ROLE</div>
-          <div id="roleIcon" class="role-icon">?</div>
-          <h2 id="roleTitle">직업 대기 중</h2>
-          <p id="roleDescription" class="muted">게임이 시작되면 비밀 직업이 배정됩니다.</p>
-          <div id="privateResult" class="private-result hidden"></div>
-          <div id="actions" class="actions"></div>
-          <div id="hostControls" class="host-controls hidden">
-            <button id="startGame" class="btn btn-primary">게임 시작</button>
-            <button id="advancePhase" class="btn btn-secondary">다음 단계로</button>
-            <button id="restartGame" class="btn btn-quiet">재경기</button>
-            <a id="broadcastLink" class="btn btn-quiet" target="_blank" rel="noopener">방송 송출 화면 열기 ↗</a>
+          <div class="my-role-card" id="myRoleCard">
+            <div class="role-watermark" id="roleWatermark">?</div>
+            <div class="role-badge-row">
+              <span class="kicker">SECRET IDENTITY</span>
+              <div id="countdown" class="timer-pill hidden">
+                <span class="timer-icon">⏳</span>
+                <span id="countdownVal">00:00</span>
+              </div>
+            </div>
+            <div class="role-main">
+              <div id="roleIcon" class="role-avatar">?</div>
+              <div class="role-detail">
+                <h2 id="roleTitle">직업 대기 중</h2>
+                <p id="roleDescription" class="role-desc">진행자가 게임을 시작하면 극비 직업이 부여됩니다.</p>
+              </div>
+            </div>
+            <div id="privateResult" class="private-result-box hidden"></div>
           </div>
-          <div id="countdown" class="countdown hidden">--</div>
+
+          <!-- 상호작용 액션 버튼들 (투표/마피아 지목 등) -->
+          <div class="action-dock">
+            <div id="actions" class="actions-container"></div>
+          </div>
+
+          <!-- 호스트 전용 컨트롤 타워 -->
+          <div id="hostControls" class="host-tower hidden">
+            <div class="host-header">
+              <span class="host-badge">HOST CONSOLE</span>
+              <span class="host-sub">진행자 전용 제어기</span>
+            </div>
+            <div class="host-btn-grid">
+              <button id="startGame" class="btn btn-action-start">▶ 게임 시작</button>
+              <button id="advancePhase" class="btn btn-action-next">⏭ 다음 단계로 넘기기</button>
+              <button id="restartGame" class="btn btn-action-reset">🔄 게임 초기화 (로비)</button>
+              <a id="broadcastLink" class="btn btn-action-obs" target="_blank" rel="noopener">📺 방송 송출 뷰 열기 ↗</a>
+            </div>
+          </div>
         </aside>
       </div>
-      <div class="footer-note">MAFIA NIGHT: LIVE <span>·</span> 의심하고, 토론하고, 살아남으세요.</div>
+
+      <div class="game-footer">
+        <span>MAFIA NIGHT: LIVE</span>
+        <span class="dot">·</span>
+        <span>의심하고, 질문하고, 진실을 밝혀내십시오.</span>
+      </div>
     </section>
-    <section id="broadcast" class="hidden broadcast-page">
-      <div class="broadcast-top"><div class="brand"><span class="brand-mark">M</span><span>MAFIA NIGHT <em>LIVE</em></span></div><div id="broadcastCode" class="broadcast-code">ROOM -----</div></div>
-      <div class="broadcast-center"><div class="eyebrow"><span class="live-dot"></span> LIVE INVESTIGATION</div><h1 id="broadcastPhase">게임 대기 중</h1><p id="broadcastMessage">진행자가 게임을 시작하면 여기에 공개 현황이 표시됩니다.</p><div class="broadcast-timer" id="broadcastTimer">--</div></div>
-      <div class="broadcast-roster" id="broadcastPlayers"></div>
-      <div class="broadcast-bottom"><span id="broadcastRound">ROUND 00</span><span>MAFIA NIGHT: LIVE</span><span id="broadcastAlive">ALIVE 00</span></div>
+
+    <!-- 방송 전용 송출 화면 (OBS/Broadcast Mode) -->
+    <section id="broadcast" class="view-broadcast hidden">
+      <div class="broadcast-top">
+        <div class="brand">
+          <span class="brand-badge">♠</span>
+          <span class="broadcast-logo-text">MAFIA NIGHT <em>LIVE</em></span>
+        </div>
+        <div class="broadcast-meta">
+          <span id="broadcastRound" class="meta-tag">ROUND 01</span>
+          <div id="broadcastCode" class="broadcast-code-box">ROOM -----</div>
+        </div>
+      </div>
+
+      <div class="broadcast-center">
+        <div class="broadcast-status-badge">
+          <span class="live-pulse"></span>
+          <span>LIVE BROADCAST FEED</span>
+        </div>
+        <h1 id="broadcastPhase" class="broadcast-title">대기 중</h1>
+        <p id="broadcastMessage" class="broadcast-sub">진행자가 게임을 시작하면 실시간 현황이 송출됩니다.</p>
+        <div class="broadcast-timer-wrap">
+          <div class="broadcast-timer" id="broadcastTimer">--:--</div>
+        </div>
+      </div>
+
+      <div class="broadcast-roster-wrap">
+        <div class="roster-header">
+          <span>CITIZENS & SUSPECTS</span>
+          <span id="broadcastAlive" class="alive-counter">ALIVE 00 / 00</span>
+        </div>
+        <div class="broadcast-roster" id="broadcastPlayers"></div>
+      </div>
+
+      <div class="broadcast-bottom">
+        <span>ON-AIR STREAM OVERLAY</span>
+        <span class="dot">·</span>
+        <span>MAFIA NIGHT SOCIAL DEDUCTION ENGINE</span>
+      </div>
     </section>
   </main>
-  <div id="toast" class="toast" role="status"></div>
+
+  <div id="toast" class="toast-popup" role="status"></div>
   <script src="./app.js"></script>
 </body>
 </html>

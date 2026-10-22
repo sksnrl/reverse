@@ -3,190 +3,406 @@
   const mode = params.get("mode") || "home";
   const roomParam = (params.get("room") || "").toUpperCase();
   const $ = id => document.getElementById(id);
+
+  // 직업별 아이콘 및 설명 고도화 (이모지 & 컬러 테마 연계)
   const roleInfo = {
-    mafia: {name:"마피아",icon:"♠",desc:"밤마다 한 명을 제거 대상으로 선택합니다. 다른 마피아와 협력하세요."},
-    police: {name:"경찰",icon:"⌕",desc:"밤마다 한 명을 조사해 마피아인지 확인합니다. 결과는 본인에게만 보입니다."},
-    doctor: {name:"의사",icon:"✚",desc:"밤마다 한 명을 보호합니다. 공격 대상과 일치하면 생존합니다."},
-    medium: {name:"영매",icon:"◉",desc:"밤마다 이미 탈락한 플레이어의 진영을 확인합니다."},
-    citizen: {name:"시민",icon:"◎",desc:"특별한 밤 능력은 없습니다. 토론과 투표로 마피아를 찾아내세요."}
+    mafia: {
+      name: "마피아",
+      icon: "🕵️‍♂️",
+      symbol: "♠",
+      desc: "어둠 속에 숨어 매일 밤 한 명을 제거합니다. 동료 마피아와 함께 도시를 장악하세요.",
+      color: "var(--crimson)"
+    },
+    police: {
+      name: "경찰",
+      icon: "👮‍♂️",
+      symbol: "⌕",
+      desc: "밤마다 한 명을 지목해 마피아 여부를 수사합니다. 결과는 본인에게만 은밀히 통보됩니다.",
+      color: "var(--cyan)"
+    },
+    doctor: {
+      name: "의사",
+      icon: "💉",
+      symbol: "✚",
+      desc: "밤마다 한 명을 선택해 치명적인 습격으로부터 보호하고 생명을 구호합니다.",
+      color: "var(--emerald)"
+    },
+    medium: {
+      name: "영매",
+      icon: "🔮",
+      symbol: "◉",
+      desc: "밤마다 이미 사망한 영혼들의 정체와 진영을 감응하여 확인합니다.",
+      color: "var(--purple)"
+    },
+    citizen: {
+      name: "시민",
+      icon: "👤",
+      symbol: "◎",
+      desc: "특수 능력은 없으나 예리한 관찰과 낮 투표를 통해 도시의 마피아를 축출해야 합니다.",
+      color: "var(--gold)"
+    }
   };
+
+  const phaseMeta = {
+    lobby: { title: "참가자 대기", icon: "⌛", bodyClass: "theme-lobby" },
+    night: { title: "밤의 숙청", icon: "🌙", bodyClass: "theme-night" },
+    announcement: { title: "새벽 결과 발표", icon: "📢", bodyClass: "theme-day" },
+    discussion: { title: "낮의 토론", icon: "☀️", bodyClass: "theme-day" },
+    voting: { title: "최후의 투표", icon: "⚖️", bodyClass: "theme-voting" },
+    verdict: { title: "심판의 결과", icon: "🩸", bodyClass: "theme-voting" },
+    finished: { title: "게임 종료", icon: "🏆", bodyClass: "theme-lobby" }
+  };
+
   let socket = null, state = null, me = null, isHost = false, hostToken = null;
-  let chosenTarget = null, countdownInterval = null;
+  let countdownInterval = null;
+
   const saveSession = (code, playerId, host=false, token=null) => {
     try { sessionStorage.setItem("mn_session", JSON.stringify({code,playerId,host,token})); } catch {}
   };
   const readSession = () => { try { return JSON.parse(sessionStorage.getItem("mn_session") || "null"); } catch { return null; } };
+
   function toast(msg) {
     const el = $("toast"); if (!el) return;
     el.textContent = msg; el.classList.add("show");
     setTimeout(() => el.classList.remove("show"), 2800);
   }
+
+  function getBackendUrl() {
+    let url = localStorage.getItem("mn_backend_url");
+    if (!url) {
+      if (location.origin.includes("render.com") || location.origin.includes("localhost") || location.origin.includes("127.0.0.1")) {
+        url = location.origin;
+      } else {
+        url = prompt("게임 서버 주소를 입력하세요 (예: https://mafia-night-live.onrender.com)");
+      }
+    }
+    if (url) {
+      url = url.replace(/\/+$/, "");
+      localStorage.setItem("mn_backend_url", url);
+    }
+    return url;
+  }
+
   function connect() {
     if (socket) return;
-    const backend = localStorage.getItem("mn_backend_url") || prompt("게임 서버 주소를 입력하세요 (예: https://mafia-night-live.onrender.com)");
-    if (!backend) { toast("서버 주소가 필요합니다."); return; }
-    localStorage.setItem("mn_backend_url", backend.replace(/\/+$/,""));
-    socket = io(backend.replace(/\/+$/,""), { transports:["websocket","polling"] });
+    const backend = getBackendUrl();
+    if (!backend) { toast("서버 주소가 설정되지 않았습니다."); return; }
+
+    socket = io(backend, { transports: ["websocket", "polling"] });
+
     socket.on("connect", () => {
       const saved = readSession();
       if (saved && mode !== "broadcast") {
-        socket.emit("room:reconnect", {code:saved.code,playerId:saved.playerId,hostToken:saved.token || null});
+        socket.emit("room:reconnect", { code: saved.code, playerId: saved.playerId, hostToken: saved.token || null });
       }
     });
-    socket.on("connect_error", () => toast("서버 연결에 실패했습니다. 주소와 서버 상태를 확인하세요."));
+
+    socket.on("connect_error", () => toast("서버 연결에 실패했습니다. Render 서버가 절전 모드에서 깨어나는 중일 수 있습니다."));
     socket.on("error_message", msg => toast(msg));
+    
     socket.on("created", data => {
       me = data.playerId; isHost = true; hostToken = data.hostToken;
       saveSession(data.code, me, true, hostToken);
       showGame(data.code);
       history.replaceState({}, "", `?room=${data.code}`);
-      socket.data = socket.data || {};
     });
+
     socket.on("joined", data => {
-      me = data.playerId; isHost = false; saveSession(data.code, me);
-      showGame(data.code); history.replaceState({}, "", `?room=${data.code}`);
+      me = data.playerId; isHost = false;
+      saveSession(data.code, me);
+      showGame(data.code);
+      history.replaceState({}, "", `?room=${data.code}`);
     });
+
     socket.on("reconnected", data => {
       me = data.playerId;
       const s = readSession(); isHost = !!s?.host; hostToken = s?.token || null;
       showGame(data.code);
     });
+
     socket.on("state", s => { state = s; renderState(); });
     socket.on("private_state", p => { me = p.playerId; renderPrivate(p); });
     socket.on("action_ack", d => toast(d.message));
     socket.on("vote_ack", d => toast(d.message));
     socket.on("kicked", msg => { toast(msg); setTimeout(() => location.href = location.pathname, 900); });
   }
+
   function showGame(code) {
-    $("home").classList.add("hidden"); $("game").classList.remove("hidden");
+    $("home").classList.add("hidden");
+    $("game").classList.remove("hidden");
     $("roomCode").textContent = code;
     $("broadcastLink").href = `${location.origin}${location.pathname}?mode=broadcast&room=${code}`;
     $("hostControls").classList.toggle("hidden", !isHost);
   }
+
   function createRoom() {
     connect();
     const nick = $("hostNick").value.trim() || "진행자";
-    const go = () => socket.emit("room:create", {nickname:nick});
+    const go = () => socket.emit("room:create", { nickname: nick });
     if (socket?.connected) go(); else socket?.once("connect", go);
   }
+
   function joinRoom() {
     connect();
     const code = $("joinCode").value.trim().toUpperCase();
     const nickname = $("playerNick").value.trim();
     if (!code || !nickname) return toast("방 코드와 닉네임을 입력하세요.");
-    const go = () => socket.emit("room:join", {code,nickname});
+    const go = () => socket.emit("room:join", { code, nickname });
     if (socket?.connected) go(); else socket?.once("connect", go);
   }
+
   function renderState() {
     if (!state) return;
     if (mode === "broadcast") return renderBroadcast();
+
     showGame(state.code);
     $("roomCode").textContent = state.code;
     $("playerCount").textContent = `${state.players.length} / ${state.maxPlayers}`;
-    const titles = {lobby:"참가자 대기",night:"밤",announcement:"아침 결과",discussion:"토론",voting:"투표",verdict:"투표 결과",finished:"게임 종료"};
-    $("phaseTitle").textContent = `${titles[state.phase] || state.phase}${state.round ? ` · ${state.round}라운드` : ""}`;
+
+    const currentMeta = phaseMeta[state.phase] || { title: state.phase, icon: "⚔️", bodyClass: "theme-lobby" };
+    document.body.className = currentMeta.bodyClass;
+    $("phaseIcon").textContent = currentMeta.icon;
+    $("phaseTitle").textContent = `${currentMeta.title}${state.round ? ` · 제 ${state.round} 라운드` : ""}`;
     $("phaseMessage").textContent = state.message || "";
+
+    // 플레이어 목록 렌더링
     $("players").innerHTML = state.players.map(p => {
-      const role = state.revealedRoles?.[p.id];
       const isMe = p.id === me;
-      const status = !p.connected ? "연결 끊김" : p.alive ? "생존" : "탈락";
-      return `<div class="player-card ${p.alive ? "" : "dead"}"><div class="player-name">${escapeHtml(p.nickname)}${isMe ? " (나)" : ""}</div><div class="player-meta"><span><i class="dot-status ${p.connected ? "" : "off"}"></i>${status}</span><span>${role ? roleInfo[role]?.name || role : (p.alive ? "미공개" : "탈락")}</span></div></div>`;
+      const role = state.revealedRoles?.[p.id];
+      const rObj = role ? roleInfo[role] : null;
+      const statusText = !p.connected ? "접속 끊김" : p.alive ? "생존" : "탈락";
+      const avatarIcon = p.alive ? (isMe ? "😎" : "👤") : "💀";
+
+      return `
+        <div class="player-card ${p.alive ? "" : "dead"} ${isMe ? "is-me" : ""}">
+          <div class="player-head">
+            <div class="avatar-circle">${avatarIcon}</div>
+            <div class="player-name-wrap">
+              <div class="player-name" title="${escapeHtml(p.nickname)}">${escapeHtml(p.nickname)}</div>
+              ${isMe ? '<div class="player-tag-me">YOU</div>' : ''}
+            </div>
+          </div>
+          <div class="player-meta">
+            <span class="status-badge">
+              <i class="dot-status ${p.connected ? "" : "off"}"></i>
+              <span>${statusText}</span>
+            </span>
+            <span class="role-reveal-tag">
+              ${rObj ? rObj.name : (p.alive ? "미공개" : "사망")}
+            </span>
+          </div>
+        </div>
+      `;
     }).join("");
+
     $("countdown").classList.toggle("hidden", !state.deadline || state.status !== "playing");
     if (state.deadline) startCountdown();
+
     if (state.status === "finished") {
-      $("roleTitle").textContent = state.winner === "mafia" ? "마피아 진영 승리" : "시민 진영 승리";
-      $("roleDescription").textContent = "모든 직업이 공개되었습니다. 재경기로 새 판을 시작할 수 있습니다.";
+      const isMafiaWin = state.winner === "mafia";
+      $("roleTitle").textContent = isMafiaWin ? "마피아 진영 승리!" : "시민 진영 승리!";
+      $("roleIcon").textContent = isMafiaWin ? "🕵️‍♂️" : "🏆";
+      $("roleDescription").textContent = "모든 진실이 밝혀졌습니다. 재경기 버튼으로 새로운 판을 시작할 수 있습니다.";
     }
   }
+
   function renderPrivate(p) {
     isHost = !!p.isHost; hostToken = p.hostToken || hostToken;
     $("hostControls").classList.toggle("hidden", !isHost);
+
     if (p.role && roleInfo[p.role]) {
       const r = roleInfo[p.role];
-      $("roleIcon").textContent = r.icon; $("roleTitle").textContent = r.name; $("roleDescription").textContent = r.desc;
-      $("roleIcon").style.color = p.role === "mafia" ? "var(--red)" : "var(--cyan)";
+      $("roleIcon").textContent = r.icon;
+      $("roleWatermark").textContent = r.symbol;
+      $("roleTitle").textContent = r.name;
+      $("roleDescription").textContent = r.desc;
+      $("roleIcon").style.borderColor = r.color;
     } else if (p.isHost) {
-      $("roleIcon").textContent = "GM"; $("roleTitle").textContent = "진행자";
-      $("roleDescription").textContent = "참가자를 확인한 뒤 게임을 시작하세요.";
+      $("roleIcon").textContent = "👑";
+      $("roleWatermark").textContent = "GM";
+      $("roleTitle").textContent = "진행자 (게임 마스터)";
+      $("roleDescription").textContent = "참가자들을 확인하고 게임의 흐름을 통제합니다.";
     }
+
     const result = p.privateResult;
     $("privateResult").classList.toggle("hidden", !result);
-    if (result) $("privateResult").textContent = `${result.nickname} 조사 결과: ${result.result}`;
-    const actions = $("actions"); actions.innerHTML = "";
+    if (result) {
+      $("privateResult").innerHTML = `<strong>[조사 보고]</strong> ${escapeHtml(result.nickname)}님의 정체는 <strong>${escapeHtml(result.result)}</strong>입니다.`;
+    }
+
+    const actions = $("actions");
+    actions.innerHTML = "";
     if (!state || state.status !== "playing" || !p.alive || p.isHost) return;
-    if (state.phase === "night" && ["mafia","police","doctor","medium"].includes(p.role)) {
-      const candidates = state.players.filter(x => p.role === "medium" ? !x.alive : x.alive && (p.role === "doctor" || x.id !== p.playerId) && !(p.role === "mafia" && x.id === p.playerId));
-      actions.innerHTML = `<div class="section-kicker">NIGHT ACTION</div><p class="muted">행동할 대상을 선택하세요.</p>` + candidates.map(x => `<button class="target-btn" data-target="${x.id}">${escapeHtml(x.nickname)} · ${x.alive ? "생존" : "탈락"}</button>`).join("");
+
+    if (state.phase === "night" && ["mafia", "police", "doctor", "medium"].includes(p.role)) {
+      const candidates = state.players.filter(x => 
+        p.role === "medium" 
+          ? !x.alive 
+          : x.alive && (p.role === "doctor" || x.id !== p.playerId) && !(p.role === "mafia" && x.id === p.playerId)
+      );
+
+      actions.innerHTML = `
+        <div class="kicker">SECRET NIGHT ACTION</div>
+        <p class="role-desc" style="margin-bottom:8px;">능력을 행사할 대상을 선택하세요.</p>
+        ${candidates.map(x => `
+          <button class="target-btn" data-target="${x.id}">
+            <span>🎯 ${escapeHtml(x.nickname)}</span>
+            <small style="opacity:0.7">${x.alive ? "생존" : "사망"}</small>
+          </button>
+        `).join("")}
+      `;
+
       actions.querySelectorAll("[data-target]").forEach(b => b.addEventListener("click", () => {
-        if (confirm(`${b.textContent} 대상을 선택할까요?`)) socket.emit("game:action",{targetId:b.dataset.target});
+        if (confirm(`[${b.querySelector("span").textContent.replace("🎯 ","")}] 님을 선택하시겠습니까?`)) {
+          socket.emit("game:action", { targetId: b.dataset.target });
+        }
       }));
-      if (p.actionSubmitted) actions.insertAdjacentHTML("beforeend", `<p class="private-result">이번 밤 행동을 제출했습니다.</p>`);
+
+      if (p.actionSubmitted) {
+        actions.insertAdjacentHTML("beforeend", `<div class="private-status-note">✓ 이번 밤의 비밀 작전 지시를 완료했습니다.</div>`);
+      }
     } else if (state.phase === "voting") {
       const candidates = state.players.filter(x => x.alive && x.id !== p.playerId);
-      actions.innerHTML = `<div class="section-kicker">PUBLIC VOTE</div><p class="muted">처형할 대상을 선택하세요.</p>` + candidates.map(x => `<button class="target-btn" data-target="${x.id}">${escapeHtml(x.nickname)}${state.voteCounts?.[x.id] ? ` · ${state.voteCounts[x.id]}표` : ""}</button>`).join("") + `<button class="target-btn" data-target="abstain">기권하기</button>`;
+      actions.innerHTML = `
+        <div class="kicker">PUBLIC TRIAL VOTE</div>
+        <p class="role-desc" style="margin-bottom:8px;">의심되는 용의자에게 사형 표를 던지세요.</p>
+        ${candidates.map(x => `
+          <button class="target-btn" data-target="${x.id}">
+            <span>⚖️ ${escapeHtml(x.nickname)}</span>
+            <small style="color:var(--gold); font-weight:bold;">${state.voteCounts?.[x.id] ? `${state.voteCounts[x.id]}표 획득` : "0표"}</small>
+          </button>
+        `).join("")}
+        <button class="target-btn" data-target="abstain" style="margin-top:6px; opacity:0.8;">
+          <span>🏳️ 기권하기</span>
+          <small>보류</small>
+        </button>
+      `;
+
       actions.querySelectorAll("[data-target]").forEach(b => b.addEventListener("click", () => {
-        if (confirm(`${b.textContent}에 투표할까요? 마감 전 재투표할 수 있습니다.`)) socket.emit("game:vote",{targetId:b.dataset.target});
+        const name = b.querySelector("span").textContent;
+        if (confirm(`${name}에 투표하시겠습니까? (투표 마감 전까지 변경 가능)`)) {
+          socket.emit("game:vote", { targetId: b.dataset.target });
+        }
       }));
-      if (p.hasVoted) actions.insertAdjacentHTML("beforeend", `<p class="private-result">투표 제출 완료 · 마감 전 변경 가능</p>`);
+
+      if (p.hasVoted) {
+        actions.insertAdjacentHTML("beforeend", `<div class="private-status-note">✓ 투표가 정상 반영되었습니다. (마감 전 변경 가능)</div>`);
+      }
     } else if (!p.alive) {
-      actions.innerHTML = `<p class="muted">탈락했습니다. 다음 게임까지 관전할 수 있습니다.</p>`;
+      actions.innerHTML = `<p class="role-desc" style="color:var(--crimson);">당신은 사망했습니다. 사후 세계에서 게임을 지켜보세요.</p>`;
     }
   }
+
   function startCountdown() {
     if (countdownInterval) clearInterval(countdownInterval);
     const tick = () => {
       if (!state?.deadline) return;
       const secs = Math.max(0, Math.ceil((state.deadline - Date.now()) / 1000));
-      $("countdown").textContent = `${String(Math.floor(secs/60)).padStart(2,"0")}:${String(secs%60).padStart(2,"0")}`;
-      if (mode === "broadcast") $("broadcastTimer").textContent = $("countdown").textContent;
+      const timeStr = `${String(Math.floor(secs/60)).padStart(2,"0")}:${String(secs%60).padStart(2,"0")}`;
+      if ($("countdownVal")) $("countdownVal").textContent = timeStr;
+      if (mode === "broadcast" && $("broadcastTimer")) $("broadcastTimer").textContent = timeStr;
     };
-    tick(); countdownInterval = setInterval(tick, 300);
+    tick();
+    countdownInterval = setInterval(tick, 300);
   }
+
   function renderBroadcast() {
     $("broadcastCode").textContent = `ROOM ${state.code}`;
-    const labels = {lobby:"참가자 대기",night:"밤이 찾아왔습니다",announcement:"아침 결과",discussion:"토론 시간",voting:"최후의 투표",verdict:"판결",finished:state.winner === "mafia" ? "MAFIA VICTORY" : "CITIZENS VICTORY"};
-    $("broadcastPhase").textContent = labels[state.phase] || "MAFIA NIGHT";
+    const titles = {
+      lobby: "참가자 대기 중",
+      night: "밤이 찾아왔습니다",
+      announcement: "아침 결과 발표",
+      discussion: "낮 토론 시간",
+      voting: "최후의 심판 투표",
+      verdict: "처형 판결",
+      finished: state.winner === "mafia" ? "마피아 진영 승리!" : "시민 진영 승리!"
+    };
+    $("broadcastPhase").textContent = titles[state.phase] || "MAFIA NIGHT";
     $("broadcastMessage").textContent = state.message || "";
-    $("broadcastRound").textContent = `ROUND ${String(state.round).padStart(2,"0")}`;
-    $("broadcastAlive").textContent = `ALIVE ${String(state.players.filter(p=>p.alive).length).padStart(2,"0")}`;
+    $("broadcastRound").textContent = `ROUND ${String(state.round || 1).padStart(2,"0")}`;
+
+    const alives = state.players.filter(p => p.alive).length;
+    $("broadcastAlive").textContent = `ALIVE ${String(alives).padStart(2,"0")} / ${String(state.players.length).padStart(2,"0")}`;
+
     $("broadcastPlayers").innerHTML = state.players.map(p => {
       const role = state.revealedRoles?.[p.id];
-      return `<div class="broadcast-player ${p.alive ? "" : "dead"}"><div class="avatar">${escapeHtml(p.nickname.slice(0,1))}</div><strong>${escapeHtml(p.nickname)}</strong><small>${p.alive ? "ALIVE" : (roleInfo[role]?.name || "ELIMINATED")}</small></div>`;
+      const rName = roleInfo[role]?.name || "ELIMINATED";
+      return `
+        <div class="broadcast-player ${p.alive ? "" : "dead"}">
+          <div class="avatar">${p.alive ? "👤" : "💀"}</div>
+          <strong>${escapeHtml(p.nickname)}</strong>
+          <small>${p.alive ? "ALIVE" : rName}</small>
+        </div>
+      `;
     }).join("");
-    if (state.deadline) startCountdown(); else $("broadcastTimer").textContent = "--";
+
+    if (state.deadline) startCountdown();
+    else if ($("broadcastTimer")) $("broadcastTimer").textContent = "--:--";
   }
+
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
+
   function setup() {
+    $("serverConfigBtn").addEventListener("click", () => {
+      const cur = localStorage.getItem("mn_backend_url") || "";
+      const next = prompt("연결할 백엔드 서버 URL을 입력하세요:", cur);
+      if (next !== null) {
+        localStorage.setItem("mn_backend_url", next.trim().replace(/\/+$/, ""));
+        toast("서버 주소가 저장되었습니다. 새로고침합니다.");
+        setTimeout(() => location.reload(), 600);
+      }
+    });
+
     if (mode === "broadcast") {
-      $("home").classList.add("hidden"); $("game").classList.add("hidden"); $("broadcast").classList.remove("hidden");
-      const backend = localStorage.getItem("mn_backend_url") || prompt("게임 서버 주소를 입력하세요 (예: https://mafia-night-live.onrender.com)");
+      $("home").classList.add("hidden");
+      $("game").classList.add("hidden");
+      $("broadcast").classList.remove("hidden");
+      document.body.className = "theme-night";
+
+      const backend = getBackendUrl();
       if (!backend) { toast("서버 주소가 필요합니다."); return; }
-      localStorage.setItem("mn_backend_url", backend.replace(/\/+$/,""));
-      socket = io(backend.replace(/\/+$/,""), {transports:["websocket","polling"]});
-      socket.on("connect", () => socket.emit("room:watch", {code:roomParam}));
-      socket.on("state", s => {state=s;renderBroadcast();});
-      socket.on("connect_error", () => toast("서버 연결에 실패했습니다. 주소를 확인하세요."));
+
+      socket = io(backend, { transports: ["websocket", "polling"] });
+      socket.on("connect", () => socket.emit("room:watch", { code: roomParam }));
+      socket.on("state", s => { state = s; renderBroadcast(); });
+      socket.on("connect_error", () => toast("방송 서버 연동에 실패했습니다."));
       socket.on("error_message", toast);
       return;
     }
+
     $("createRoom").addEventListener("click", createRoom);
     $("joinRoom").addEventListener("click", joinRoom);
-    $("copyCode").addEventListener("click", async () => { try { await navigator.clipboard.writeText($("roomCode").textContent); toast("방 코드를 복사했습니다."); } catch { toast("방 코드: "+$("roomCode").textContent); }});
+    
+    $("copyCode").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText($("roomCode").textContent);
+        toast("방 코드를 클립보드에 복사했습니다.");
+      } catch {
+        toast("방 코드: " + $("roomCode").textContent);
+      }
+    });
+
     $("startGame").addEventListener("click", () => socket.emit("game:start"));
     $("advancePhase").addEventListener("click", () => socket.emit("host:advance"));
-    $("restartGame").addEventListener("click", () => {if(confirm("게임을 초기화하고 로비로 돌아갈까요?"))socket.emit("host:restart");});
-    $("joinCode").addEventListener("input", e => e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""));
+    $("restartGame").addEventListener("click", () => {
+      if (confirm("게임을 초기화하고 로비로 돌아갈까요?")) socket.emit("host:restart");
+    });
+
+    $("joinCode").addEventListener("input", e => {
+      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    });
+
     if (roomParam) {
       const saved = readSession();
       if (saved && saved.code === roomParam) connect();
-      else { $("joinCode").value = roomParam; $("joinCode").focus(); }
+      else {
+        $("joinCode").value = roomParam;
+        $("joinCode").focus();
+      }
     }
   }
-  // Broadcast observer uses a dedicated event; never joins as a player.
+
   setup();
 })();
-
-
